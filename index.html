@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Wife Challenge</title>
+<style>
+  :root{
+    --cream:#fff9f2;
+    --ink:#2b2b2b;
+    --yes:#7fb0ff;
+    --yes-dark:#5a93f0;
+    --no:#dcdcdc;
+    --pink:#ff6f91;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#f2f2f0;
+    font-family:'Segoe UI', system-ui, sans-serif;
+    color:var(--ink);
+  }
+  .frame{
+    width:min(92vw, 900px);
+    min-height:600px;
+    background:var(--cream);
+    border:1px solid #ececec;
+    border-radius:28px;
+    box-shadow:0 12px 40px rgba(0,0,0,.06);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    overflow:hidden;
+    padding:24px;
+  }
+  .card{
+    width:min(90%, 640px);
+    padding:56px 40px;
+    text-align:center;
+    position:relative;
+  }
+  .face{
+    width:90px;
+    margin-bottom:8px;
+    display:inline-block;
+    transition:transform .3s ease;
+  }
+  .face img{
+    width:100%;
+    display:block;
+  }
+  h1{
+    font-size:clamp(24px,4vw,36px);
+    margin:12px 0 48px;
+    line-height:1.3;
+  }
+  .buttons{
+    position:relative;
+    height:260px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    left:-80px;
+  }
+  button{
+    border:none;
+    border-radius:999px;
+    font-weight:700;
+    font-size:22px;
+    font-family:inherit;
+    cursor:pointer;
+    padding:20px 48px;
+    transition:transform .25s ease, padding .25s ease, font-size .25s ease, background .25s ease;
+  }
+  #yes{
+    background:var(--yes);
+    color:white;
+    box-shadow:0 8px 20px rgba(90,147,240,.35);
+  }
+  #yes:hover{
+    background:var(--yes-dark);
+    transform:scale(1.15);
+  }
+  #no{
+    background:var(--no);
+    color:#555;
+    position:absolute;
+    transform-origin:center;
+    transition:left .16s ease-out, top .16s ease-out, transform .16s ease-out;
+  }
+  .hint{
+    margin-top:40px;
+    color:#999;
+    font-size:15px;
+  }
+  .result{
+    display:none;
+  }
+  .result.show{
+    display:block;
+    animation:pop .4s ease;
+  }
+  .result .yay{
+    font-size:34px;
+    font-weight:800;
+    margin:20px 0;
+  }
+  .photo-frame{
+    width:150px;
+    height:180px;
+    margin:0 auto 20px;
+    border-radius:14px;
+    overflow:hidden;
+    box-shadow:0 10px 30px rgba(0,0,0,.12);
+  }
+  .photo-frame img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .caption{
+    color:#888;
+    font-size:16px;
+    margin-top:10px;
+  }
+  @keyframes pop{
+    from{transform:scale(.85); opacity:0;}
+    to{transform:scale(1); opacity:1;}
+  }
+  .question.hide{
+    display:none;
+  }
+  .confetti-piece{
+    position:fixed;
+    top:0;
+    left:0;
+    width:9px;
+    height:14px;
+    opacity:1;
+    pointer-events:none;
+    z-index:999;
+    animation-name:confetti-burst;
+    animation-timing-function:cubic-bezier(.2,.7,.3,1);
+    animation-fill-mode:forwards;
+  }
+  @keyframes confetti-burst{
+    0%{
+      transform:translate(0,0) rotate(0deg);
+      opacity:1;
+    }
+    70%{
+      opacity:1;
+    }
+    100%{
+      transform:translate(var(--tx), var(--ty)) rotate(var(--rot));
+      opacity:0;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="frame">
+  <div class="card">
+    <div class="question" id="question">
+      <div class="face" id="face"><img src="head.png" alt="face"></div>
+      <h1>Do you accept today's Wife Challenge?</h1>
+      <div class="buttons">
+        <button id="yes">Yes</button>
+        <button id="no">No</button>
+      </div>
+      <div class="hint">"No" is just here for decoration 😬</div>
+    </div>
+
+    <div class="result" id="result">
+      <div class="face"><img src="head.png" alt="face"></div>
+      <h1>Do you accept today's Wife Challenge?</h1>
+      <div class="yay">YAY! 😜</div>
+      <div class="photo-frame" id="photo"><img src="photo_couple.png" alt="Us"></div>
+      <div class="caption">That's exactly why you're my favourite person.</div>
+    </div>
+  </div>
+  </div>
+
+<script>
+  const noBtn = document.getElementById('no');
+  const yesBtn = document.getElementById('yes');
+  const container = document.querySelector('.buttons');
+  const question = document.getElementById('question');
+  const result = document.getElementById('result');
+
+  const SAFE_DISTANCE = 130; // px cursor must stay away from No's center
+  const MIN_SCALE = 0.35;    // smallest No is allowed to shrink to
+  const SHRINK_STEP = 0.12;  // how much smaller it gets per dodge
+  let noScale = 1;
+
+  function placeNo(x, y){
+    noBtn.style.left = x + 'px';
+    noBtn.style.top = y + 'px';
+  }
+
+  function randomSpot(){
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    const bw = noBtn.offsetWidth || 140;
+    const bh = noBtn.offsetHeight || 60;
+    return {
+      x: Math.random() * (w - bw),
+      y: Math.random() * (h - bh)
+    };
+  }
+
+  function distance(ax, ay, bx, by){
+    return Math.hypot(ax - bx, ay - by);
+  }
+
+  function dodge(cursorX, cursorY){
+    // try a handful of candidate spots and keep the one farthest from the cursor
+    let best = null, bestDist = -1;
+    for (let i = 0; i < 8; i++){
+      const spot = randomSpot();
+      const centerX = spot.x + (noBtn.offsetWidth || 140) / 2;
+      const centerY = spot.y + (noBtn.offsetHeight || 60) / 2;
+      const d = distance(cursorX, cursorY, centerX, centerY);
+      if (d > bestDist){ bestDist = d; best = spot; }
+    }
+    placeNo(best.x, best.y);
+
+    noScale = Math.max(MIN_SCALE, noScale - SHRINK_STEP);
+    noBtn.style.transform = `scale(${noScale})`;
+  }
+
+  // initial placement: roughly where it visually was, right of center
+  const initX = container.clientWidth / 2 + 90;
+  const initY = container.clientHeight / 2 - 30;
+  placeNo(initX, initY);
+
+  container.addEventListener('mousemove', (e) => {
+    const rect = container.getBoundingClientRect();
+    const cursorX = e.clientX - rect.left;
+    const cursorY = e.clientY - rect.top;
+
+    const noRect = noBtn.getBoundingClientRect();
+    const centerX = noRect.left - rect.left + noRect.width / 2;
+    const centerY = noRect.top - rect.top + noRect.height / 2;
+
+    if (distance(cursorX, cursorY, centerX, centerY) < SAFE_DISTANCE){
+      dodge(cursorX, cursorY);
+    }
+  });
+
+  // Belt and braces: clicking it (e.g. via touch) never works
+  noBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    dodge(container.clientWidth / 2, container.clientHeight / 2);
+  });
+
+  function launchConfetti(originX, originY){
+    const colors = ['#7fb0ff','#ff6f91','#ffd166','#7bd389','#c39bd3','#ff8c42'];
+    const pieceCount = 140;
+
+    for (let i = 0; i < pieceCount; i++){
+      const piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 180 + Math.random() * 340;
+      const tx = Math.cos(angle) * distance;
+      const ty = Math.sin(angle) * distance + 120; // gravity bias downward
+      const rot = (Math.random() * 720 - 360) + 'deg';
+
+      piece.style.left = originX + 'px';
+      piece.style.top = originY + 'px';
+      piece.style.setProperty('--tx', tx + 'px');
+      piece.style.setProperty('--ty', ty + 'px');
+      piece.style.setProperty('--rot', rot);
+      piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+      piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+      piece.style.animationDuration = (900 + Math.random() * 700) + 'ms';
+      piece.style.animationDelay = (Math.random() * 120) + 'ms';
+
+      document.body.appendChild(piece);
+      piece.addEventListener('animationend', () => piece.remove());
+    }
+  }
+
+  yesBtn.addEventListener('click', (e) => {
+    const rect = yesBtn.getBoundingClientRect();
+    launchConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+
+    question.classList.add('hide');
+    result.classList.add('show');
+  });
+</script>
+</body>
+</html>
